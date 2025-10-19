@@ -66,10 +66,7 @@ class PathResourceLookupFunction implements Function<ServerRequest, Mono<Resourc
 
 		pathContainer = this.pattern.extractPathWithinPattern(pathContainer);
 		String path = processPath(pathContainer.value());
-		if (!StringUtils.hasText(path) || isInvalidPath(path)) {
-			return Mono.empty();
-		}
-		if (isInvalidEncodedInputPath(path)) {
+		if (!StringUtils.hasLength(path) || isInvalidPath(path)) {
 			return Mono.empty();
 		}
 
@@ -139,12 +136,30 @@ class PathResourceLookupFunction implements Function<ServerRequest, Mono<Resourc
 			}
 			else if (path.charAt(i) > ' ' && path.charAt(i) != 127) {
 				if (i == 0 || (i == 1 && slash)) {
+					path = normalizePath(path);
 					return path;
 				}
-				return (slash ? "/" + path.substring(i) : path.substring(i));
+				path = slash ? "/" + path.substring(i) : path.substring(i);
+				path = normalizePath(path);
+				return path;
 			}
 		}
 		return (slash ? "/" : "");
+	}
+
+	private String normalizePath(String path) {
+		if (path.contains("%")) {
+			try {
+				path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
+			}
+			catch (Exception ex) {
+				return "";
+			}
+			if (path.contains("../")) {
+				path = StringUtils.cleanPath(path);
+			}
+		}
+		return path;
 	}
 
 	private boolean isInvalidPath(String path) {
